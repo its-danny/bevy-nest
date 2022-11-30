@@ -157,16 +157,27 @@ impl Server {
                             break;
                         }
 
-                        // Convert the buffer into a string.
-                        let clean = std::str::from_utf8(&buffer[..length]).unwrap_or("").trim();
-
-                        // Send the message to the inbox.
-                        if !clean.is_empty() {
+                        if buffer[0] == 255 {
+                            // This is a command because the first byte is 255.
+                            // See: https://users.cs.cf.ac.uk/Dave.Marshall/Internet/node141.html
                             if let Err(error) = inbox_sender.send(Inbox {
                                 from: id,
-                                content: Message::Text(clean.into()),
+                                content: Message::Command(buffer[..length].to_vec()),
                             }) {
                                 error!("Could not send to inbox: {error}");
+                            }
+                        } else {
+                            // Convert the buffer into a string.
+                            let clean = std::str::from_utf8(&buffer[..length]).unwrap_or("").trim();
+
+                            // Send the message to the inbox.
+                            if !clean.is_empty() {
+                                if let Err(error) = inbox_sender.send(Inbox {
+                                    from: id,
+                                    content: Message::Text(clean.into()),
+                                }) {
+                                    error!("Could not send to inbox: {error}");
+                                }
                             }
                         }
                     }
@@ -189,8 +200,8 @@ impl Server {
                                     break;
                                 }
                             }
-                            Message::Raw(data) => {
-                                if let Err(err) = write_socket.write_all(data.as_slice()).await {
+                            Message::Command(command) => {
+                                if let Err(err) = write_socket.write_all(command.as_slice()).await {
                                     if let Err(err) = write_events_sender.send(NetworkEvent::Error(
                                         NetworkError::SocketWrite(err, out.to),
                                     )) {
@@ -235,11 +246,11 @@ impl Server {
                     }
                 }
             }
-            Message::Raw(data) => {
+            Message::Command(command) => {
                 if let Some(client) = self.clients.get(&out.to) {
                     if let Err(err) = client.outbox.sender.send(Outbox {
                         to: out.to,
-                        content: Message::Raw(data.clone()),
+                        content: Message::Command(command.clone()),
                     }) {
                         error!("Could not send message: {err}");
                     }
