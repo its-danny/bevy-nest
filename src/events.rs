@@ -17,8 +17,11 @@ pub enum NetworkEvent {
 
 #[derive(Debug)]
 pub enum Message {
+    /// Just your regular text message. This is appended with a newline when sent.
     Text(String),
-    Raw(Vec<u8>),
+    /// A command is a sequence of bytes used by the telnet protocol.
+    /// See: https://users.cs.cf.ac.uk/Dave.Marshall/Internet/node141.html
+    Command(Vec<u8>),
 }
 
 /// Message sent from a client. These are iterated over each
