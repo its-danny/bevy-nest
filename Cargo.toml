@@ -1,0 +1,18 @@
+[package]
+name = "bevy-nest"
+version = "0.0.0"
+edition = "2021"
+authors = ["Danny Tatom <its.danny@hey.com>"]
+description = "🪹 A telnet plugin for getting MUDdy in Bevy."
+repository = "https://github.com/its-danny/bevy-nest"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+bevy = { version = "0.9.0", default-features = false }
+crossbeam-channel = "0.5.6"
+dashmap = "5.4.0"
+thiserror = "1.0.37"
+tokio = { version = "1.22.0", features = [ "io-util", "net", "rt-multi-thread" ] }
+
+[dev-dependencies]
+rusty-hook = "0.11.2"
