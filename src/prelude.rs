@@ -1,2 +1,2 @@
 #[doc(hidden)]
-pub use crate::{errors::*, events::*, plugin::*, server::*};
+pub use crate::{errors::*, events::*, plugin::*, server::*, telnet::*};
