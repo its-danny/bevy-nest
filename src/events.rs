@@ -15,6 +15,15 @@ pub enum NetworkEvent {
     Error(NetworkError),
 }
 
+/// Data to be sent to a client over the GMCP protocol.
+#[derive(Debug)]
+pub struct Data {
+    pub package: String,
+    pub subpackage: Option<String>,
+    pub data: Option<String>,
+}
+
+/// A message sent from the server to a client or vice versa.
 #[derive(Debug)]
 pub enum Message {
     /// Just your regular text message. This is appended with a newline when sent
@@ -25,9 +34,14 @@ pub enum Message {
     ///
     /// See: <https://users.cs.cf.ac.uk/Dave.Marshall/Internet/node141.html>
     Command(Vec<u8>),
+    /// A GMCP message is a JSON object serialized into a string. The GMCP
+    /// protocol is used to send structured data to the client.
+    ///
+    /// See: <https://www.gammon.com.au/gmcp>
+    GMCP(Data),
 }
 
-/// Message sent from a client. These are iterated over each
+/// [`Message`] sent from a client. These are iterated over each
 /// update and sent to Bevy via [`Event<Inbox>`](bevy::ecs::event::Event) to be read over.
 ///
 /// ```rust
@@ -46,7 +60,7 @@ pub struct Inbox {
     pub content: Message,
 }
 
-/// Message sent to a client. These are iterated over each
+/// [`Message`] sent to a client. These are iterated over each
 /// update by the server and sent to the client's socket.
 ///
 /// ```rust

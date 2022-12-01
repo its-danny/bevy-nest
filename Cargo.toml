@@ -6,6 +6,7 @@ authors = ["Danny Tatom <its.danny@hey.com>"]
 description = "🪹 A telnet plugin for getting MUDdy in Bevy."
 repository = "https://github.com/its-danny/bevy-nest"
 license = "MIT OR Apache-2.0"
+keywords = ["gamedev", "bevy", "networking", "telnet", "mud"]
 
 [dependencies]
 bevy = { version = "0.9.0", default-features = false }
