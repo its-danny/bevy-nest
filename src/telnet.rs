@@ -12,5 +12,7 @@ pub const WONT: u8 = 252;
 pub const DO: u8 = 253;
 /// Indicates the demand that the other party stop performing
 pub const DONT: u8 = 254;
+/// GMCP sequence
+pub const GMCP: u8 = 201;
 /// Echo
 pub const ECHO: u8 = 1;

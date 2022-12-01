@@ -12,7 +12,8 @@ use tokio::{
 use crate::{
     channel::Channel,
     errors::NetworkError,
-    events::{Inbox, IncomingConnection, Message, NetworkEvent, Outbox},
+    events::{Data, Inbox, IncomingConnection, Message, NetworkEvent, Outbox},
+    telnet::*,
 };
 
 /// A unique identifier for a client.
@@ -211,6 +212,33 @@ impl Server {
                                     break;
                                 }
                             }
+                            Message::GMCP(data) => {
+                                let mut payload = vec![IAC, SB, GMCP];
+
+                                payload.extend(data.package.as_bytes());
+
+                                if let Some(subpackage) = data.subpackage {
+                                    payload.push(b'.');
+                                    payload.extend(subpackage.as_bytes());
+                                }
+
+                                if let Some(data) = data.data {
+                                    payload.push(b' ');
+                                    payload.extend(data.as_bytes());
+                                }
+
+                                payload.extend(vec![IAC, SE]);
+
+                                if let Err(err) = write_socket.write_all(payload.as_slice()).await {
+                                    if let Err(err) = write_events_sender.send(NetworkEvent::Error(
+                                        NetworkError::SocketWrite(err, out.to),
+                                    )) {
+                                        error!("Could not send error: {err}");
+                                    };
+
+                                    break;
+                                }
+                            }
                         }
                     }
                 }),
@@ -251,6 +279,20 @@ impl Server {
                     if let Err(err) = client.outbox.sender.send(Outbox {
                         to: out.to,
                         content: Message::Command(command.clone()),
+                    }) {
+                        error!("Could not send message: {err}");
+                    }
+                }
+            }
+            Message::GMCP(data) => {
+                if let Some(client) = self.clients.get(&out.to) {
+                    if let Err(err) = client.outbox.sender.send(Outbox {
+                        to: out.to,
+                        content: Message::GMCP(Data {
+                            package: data.package.clone(),
+                            subpackage: data.subpackage.clone(),
+                            data: data.data.clone(),
+                        }),
                     }) {
                         error!("Could not send message: {err}");
                     }

@@ -7,6 +7,9 @@ use bevy_nest::prelude::*;
 #[derive(Component)]
 struct Player(ClientId);
 
+#[derive(Resource)]
+struct WhoTimer(Timer);
+
 fn setup_network(server: Res<Server>) {
     server.listen("127.0.0.1:3000");
 }
@@ -22,10 +25,15 @@ fn handle_events(
             NetworkEvent::Connected(id) => {
                 commands.spawn(Player(*id));
 
+                outbox.send(Outbox {
+                    to: *id,
+                    content: Message::Command(vec![IAC, WILL, GMCP]),
+                });
+
                 for (_, player) in players.iter() {
                     outbox.send(Outbox {
                         to: player.0,
-                        content: Message::Text(format!("Player {:?} connected", id)),
+                        content: Message::Text(format!("{:?} connected", id)),
                     });
                 }
             }
@@ -36,7 +44,7 @@ fn handle_events(
                     for (_, player) in players.iter() {
                         outbox.send(Outbox {
                             to: player.0,
-                            content: Message::Text(format!("Player {:?} disconnected", id)),
+                            content: Message::Text(format!("{:?} disconnected", id)),
                         });
                     }
                 }
@@ -54,16 +62,33 @@ fn handle_messages(
     players: Query<(Entity, &Player)>,
 ) {
     for message in inbox.iter() {
-        match &message.content {
-            Message::Text(text) => {
-                for (_, player) in players.iter() {
-                    outbox.send(Outbox {
-                        to: player.0,
-                        content: Message::Text(format!("Player {:?}: {:?}", player.0, text)),
-                    });
-                }
+        if let Message::Text(text) = &message.content {
+            for (_, player) in players.iter() {
+                outbox.send(Outbox {
+                    to: player.0,
+                    content: Message::Text(format!("{:?}: {:?}", player.0, text)),
+                });
             }
-            _ => {}
+        }
+    }
+}
+
+fn who_online(
+    time: Res<Time>,
+    mut who_timer: ResMut<WhoTimer>,
+    mut outbox: EventWriter<Outbox>,
+    players: Query<&Player>,
+) {
+    if who_timer.0.tick(time.delta()).just_finished() {
+        for player in players.iter() {
+            outbox.send(Outbox {
+                to: player.0,
+                content: Message::GMCP(Data {
+                    package: "chat".into(),
+                    subpackage: Some("who".into()),
+                    data: Some(players.iter().len().to_string()),
+                }),
+            });
         }
     }
 }
@@ -73,6 +98,10 @@ fn main() {
         .insert_resource(ScheduleRunnerSettings::run_loop(Duration::from_secs_f64(
             1.0 / 60.0,
         )))
+        .insert_resource(WhoTimer(Timer::new(
+            Duration::from_secs(3),
+            TimerMode::Repeating,
+        )))
         .add_plugins(MinimalPlugins)
         .add_plugin(LogPlugin {
             ..Default::default()
@@ -81,5 +110,6 @@ fn main() {
         .add_startup_system(setup_network)
         .add_system(handle_events)
         .add_system(handle_messages)
+        .add_system(who_online)
         .run();
 }
