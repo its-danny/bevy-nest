@@ -12,7 +12,7 @@ use tokio::{
 use crate::{
     channel::Channel,
     errors::NetworkError,
-    events::{Data, Inbox, IncomingConnection, Message, NetworkEvent, Outbox},
+    events::{Inbox, IncomingConnection, Message, NetworkEvent, Outbox},
     telnet::*,
 };
 
@@ -288,11 +288,7 @@ impl Server {
                 if let Some(client) = self.clients.get(&out.to) {
                     if let Err(err) = client.outbox.sender.send(Outbox {
                         to: out.to,
-                        content: Message::GMCP(Data {
-                            package: data.package.clone(),
-                            subpackage: data.subpackage.clone(),
-                            data: data.data.clone(),
-                        }),
+                        content: Message::GMCP(data.clone()),
                     }) {
                         error!("Could not send message: {err}");
                     }

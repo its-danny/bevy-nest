@@ -16,7 +16,7 @@ pub enum NetworkEvent {
 }
 
 /// Data to be sent to a client over the GMCP protocol.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Data {
     pub package: String,
     pub subpackage: Option<String>,
