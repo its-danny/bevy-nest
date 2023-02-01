@@ -72,6 +72,7 @@ impl From<OnlineCount> for Payload {
         }
     }
 }
+
 fn who_online(
     time: Res<Time>,
     mut who_timer: ResMut<WhoTimer>,

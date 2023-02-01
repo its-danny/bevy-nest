@@ -98,9 +98,16 @@ pub struct Inbox {
 ///
 /// fn ping_pong(mut inbox: EventReader<Inbox>, mut outbox: EventWriter<Outbox>) {
 ///     for message in inbox.iter() {
-///         if let Message::Text(text) = &message.content {
-///             if text == "ping" {
-///                 outbox.send(Outbox { to: message.from, content: Message::Text("pong!".into()) })
+///         if let Message::Text(content) = &message.content {
+///             if content == "ping" {
+///                 // There are a few ways to send messages to the outbox:
+///                 // 1. Build the message and send it to the outbox.
+///                 outbox.send(Outbox { to: message.from, content: Message::Text("pong!".into()) });
+///                 // 2. Use the From trait, which is implemented for &str, String, Vec<u8>, and Payload
+///                 // for creating text, commands, and GMCP messages respectively.
+///                 outbox.send(Outbox { to: message.from, content: "pong!".into() });
+///                 // 3. Use the extension trait OutboxWriterExt, which provides convenience methods.
+///                 outbox.send_text(message.from, "pong!");
 ///             }
 ///         }
 ///     }
