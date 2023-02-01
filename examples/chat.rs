@@ -63,16 +63,15 @@ fn handle_messages(
 
 struct OnlineCount(usize);
 
-impl Into<Payload> for OnlineCount {
-    fn into(self) -> Payload {
+impl From<OnlineCount> for Payload {
+    fn from(online_count: OnlineCount) -> Self {
         Payload {
             package: "chat".into(),
             subpackage: Some("who".into()),
-            data: Some(self.0.to_string()),
+            data: Some(online_count.0.to_string()),
         }
     }
 }
-
 fn who_online(
     time: Res<Time>,
     mut who_timer: ResMut<WhoTimer>,
