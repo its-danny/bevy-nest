@@ -1,7 +1,8 @@
-use tokio::net::TcpStream;
-
 use crate::errors::NetworkError;
 use crate::server::ClientId;
+
+use bevy::prelude::EventWriter;
+use tokio::net::TcpStream;
 
 #[derive(Debug)]
 pub(crate) struct IncomingConnection {
@@ -17,7 +18,7 @@ pub enum NetworkEvent {
 
 /// Data to be sent to a client over the GMCP protocol.
 #[derive(Debug, Clone)]
-pub struct Data {
+pub struct Payload {
     pub package: String,
     pub subpackage: Option<String>,
     pub data: Option<String>,
@@ -38,7 +39,35 @@ pub enum Message {
     /// protocol is used to send structured data to the client.
     ///
     /// See: <https://www.gammon.com.au/gmcp>
-    GMCP(Data),
+    GMCP(Payload),
+}
+
+impl From<&str> for Message {
+    /// Convert a string slice into a [`Message::Text`].
+    fn from(s: &str) -> Self {
+        Message::Text(s.into())
+    }
+}
+
+impl From<String> for Message {
+    /// Convert a string into a [`Message::Text`].
+    fn from(s: String) -> Self {
+        Message::Text(s)
+    }
+}
+
+impl From<Vec<u8>> for Message {
+    /// Convert a vector of bytes into a [`Message::Command`].
+    fn from(v: Vec<u8>) -> Self {
+        Message::Command(v)
+    }
+}
+
+impl From<Payload> for Message {
+    /// Convert a [`Payload`] object into a [`Message::GMCP`].
+    fn from(payload: Payload) -> Self {
+        Message::GMCP(payload)
+    }
 }
 
 /// [`Message`] sent from a client. These are iterated over each
@@ -81,4 +110,37 @@ pub struct Inbox {
 pub struct Outbox {
     pub to: ClientId,
     pub content: Message,
+}
+
+/// Extension trait for [`EventWriter<Outbox>`] to make sending messages easier.
+pub trait OutboxWriterExt {
+    fn send_text(&mut self, to: ClientId, text: impl Into<String>);
+    fn send_command(&mut self, to: ClientId, command: impl Into<Vec<u8>>);
+    fn send_gmcp(&mut self, to: ClientId, payload: Payload);
+}
+
+impl OutboxWriterExt for EventWriter<'_, '_, Outbox> {
+    /// Sends a [`Message::Text`] to a client.
+    fn send_text(&mut self, to: ClientId, text: impl Into<String>) {
+        self.send(Outbox {
+            to,
+            content: Message::Text(text.into()),
+        })
+    }
+
+    /// Sends a [`Message::Command`] to a client.
+    fn send_command(&mut self, to: ClientId, command: impl Into<Vec<u8>>) {
+        self.send(Outbox {
+            to,
+            content: Message::Command(command.into()),
+        })
+    }
+
+    /// Sends a [`Message::GMCP`] to a client.
+    fn send_gmcp(&mut self, to: ClientId, payload: Payload) {
+        self.send(Outbox {
+            to,
+            content: Message::GMCP(payload),
+        })
+    }
 }

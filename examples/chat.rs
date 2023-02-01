@@ -25,16 +25,10 @@ fn handle_events(
             NetworkEvent::Connected(id) => {
                 commands.spawn(Player(*id));
 
-                outbox.send(Outbox {
-                    to: *id,
-                    content: Message::Command(vec![IAC, WILL, GMCP]),
-                });
+                outbox.send_command(*id, vec![IAC, WILL, GMCP]);
 
                 for (_, player) in players.iter() {
-                    outbox.send(Outbox {
-                        to: player.0,
-                        content: Message::Text(format!("{:?} connected", id)),
-                    });
+                    outbox.send_text(player.0, format!("{id:?} connected"));
                 }
             }
             NetworkEvent::Disconnected(id) => {
@@ -42,10 +36,7 @@ fn handle_events(
                     commands.entity(entity).despawn();
 
                     for (_, player) in players.iter() {
-                        outbox.send(Outbox {
-                            to: player.0,
-                            content: Message::Text(format!("{:?} disconnected", id)),
-                        });
+                        outbox.send_text(player.0, format!("{id:?} disconnected"));
                     }
                 }
             }
@@ -64,11 +55,20 @@ fn handle_messages(
     for message in inbox.iter() {
         if let Message::Text(text) = &message.content {
             for (_, player) in players.iter() {
-                outbox.send(Outbox {
-                    to: player.0,
-                    content: Message::Text(format!("{:?}: {:?}", player.0, text)),
-                });
+                outbox.send_text(player.0, format!("{:?}: {text}", message.from));
             }
+        }
+    }
+}
+
+struct OnlineCount(usize);
+
+impl Into<Payload> for OnlineCount {
+    fn into(self) -> Payload {
+        Payload {
+            package: "chat".into(),
+            subpackage: Some("who".into()),
+            data: Some(self.0.to_string()),
         }
     }
 }
@@ -81,14 +81,7 @@ fn who_online(
 ) {
     if who_timer.0.tick(time.delta()).just_finished() {
         for player in players.iter() {
-            outbox.send(Outbox {
-                to: player.0,
-                content: Message::GMCP(Data {
-                    package: "chat".into(),
-                    subpackage: Some("who".into()),
-                    data: Some(players.iter().len().to_string()),
-                }),
-            });
+            outbox.send_gmcp(player.0, OnlineCount(players.iter().len()).into());
         }
     }
 }
