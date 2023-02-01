@@ -212,24 +212,24 @@ impl Server {
                                     break;
                                 }
                             }
-                            Message::GMCP(data) => {
-                                let mut payload = vec![IAC, SB, GMCP];
+                            Message::GMCP(payload) => {
+                                let mut seq = vec![IAC, SB, GMCP];
 
-                                payload.extend(data.package.as_bytes());
+                                seq.extend(payload.package.as_bytes());
 
-                                if let Some(subpackage) = data.subpackage {
-                                    payload.push(b'.');
-                                    payload.extend(subpackage.as_bytes());
+                                if let Some(subpackage) = payload.subpackage {
+                                    seq.push(b'.');
+                                    seq.extend(subpackage.as_bytes());
                                 }
 
-                                if let Some(data) = data.data {
-                                    payload.push(b' ');
-                                    payload.extend(data.as_bytes());
+                                if let Some(data) = payload.data {
+                                    seq.push(b' ');
+                                    seq.extend(data.as_bytes());
                                 }
 
-                                payload.extend(vec![IAC, SE]);
+                                seq.extend(vec![IAC, SE]);
 
-                                if let Err(err) = write_socket.write_all(payload.as_slice()).await {
+                                if let Err(err) = write_socket.write_all(seq.as_slice()).await {
                                     if let Err(err) = write_events_sender.send(NetworkEvent::Error(
                                         NetworkError::SocketWrite(err, out.to),
                                     )) {
@@ -284,11 +284,11 @@ impl Server {
                     }
                 }
             }
-            Message::GMCP(data) => {
+            Message::GMCP(payload) => {
                 if let Some(client) = self.clients.get(&out.to) {
                     if let Err(err) = client.outbox.sender.send(Outbox {
                         to: out.to,
-                        content: Message::GMCP(data.clone()),
+                        content: Message::GMCP(payload.clone()),
                     }) {
                         error!("Could not send message: {err}");
                     }
