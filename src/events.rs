@@ -126,7 +126,7 @@ pub trait OutboxWriterExt {
     fn send_gmcp(&mut self, to: ClientId, payload: Payload);
 }
 
-impl OutboxWriterExt for EventWriter<'_, '_, Outbox> {
+impl OutboxWriterExt for EventWriter<'_, Outbox> {
     /// Sends a [`Message::Text`] to a client.
     fn send_text(&mut self, to: ClientId, text: impl Into<String>) {
         self.send(Outbox {
