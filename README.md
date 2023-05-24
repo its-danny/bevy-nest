@@ -4,6 +4,10 @@
   A telnet plugin for getting MUDdy in Bevy.
 </div>
 
+[![Crates.io](https://img.shields.io/crates/v/bevy-nest)](https://crates.io/crates/bevy-nest)
+[![Docs](https://img.shields.io/docsrs/bevy-nest)](https://docs.rs/bevy-nest/latest/bevy-nest/)
+![License](https://img.shields.io/crates/l/bevy-nest)
+
 ## Compatibility
 
 | `bevy` | `bevy-nest` |
