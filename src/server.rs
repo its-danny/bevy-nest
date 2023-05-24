@@ -20,6 +20,18 @@ use crate::{
 #[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
 pub struct ClientId(Uuid);
 
+impl ClientId {
+    pub fn new() -> Self {
+        Self(Uuid::new_v4())
+    }
+}
+
+impl Default for ClientId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 struct Client {
     outbox: Channel<Outbox>,
     #[allow(dead_code)]
@@ -112,7 +124,7 @@ impl Server {
     pub(crate) fn setup_client(&self, connection: IncomingConnection) {
         let (mut read_socket, mut write_socket) = connection.socket.into_split();
 
-        let id = ClientId(Uuid::new_v4());
+        let id = ClientId::new();
         let outbox: Channel<Outbox> = Channel::new();
 
         let read_events_sender = self.events.sender.clone();
