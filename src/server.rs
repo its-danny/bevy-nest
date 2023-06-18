@@ -118,7 +118,7 @@ impl Server {
 
     /// Disconnect a client. This will send a [`NetworkEvent::Disconnected`] event.
     pub fn disconnect(&self, client_id: &ClientId) {
-        self.clients.remove(client_id);
+        self.remove_client(client_id);
     }
 
     pub(crate) fn setup_client(&self, connection: IncomingConnection) {
