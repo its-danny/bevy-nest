@@ -2,6 +2,15 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [0.1.1](https://github.com/its-danny/bevy-nest/compare/0.1.0..0.1.1) - 2023-06-18
+#### Bug Fixes
+- disconnect should call remove_client - ([73a755c](https://github.com/its-danny/bevy-nest/commit/73a755cc2b7d4ab9f87e2ec1c17d0ece1d8d4157)) - Danny Tatom
+#### Documentation
+- **(readme)** fix badge links - ([df5cb44](https://github.com/its-danny/bevy-nest/commit/df5cb44a4c961a1da4d2169a71a85adf20ac49bb)) - Danny Tatom
+- **(readme)** link aureus as an example - ([5bcecce](https://github.com/its-danny/bevy-nest/commit/5bcecce547331339ba4c08b540c28ff0c390a098)) - Danny Tatom
+
+- - -
+
 ## [0.1.0](https://github.com/its-danny/bevy-nest/compare/41cda152176c82c8f44ae3abe5bc587233f41917..0.1.0) - 2023-05-24
 #### Build system
 - update bevy to 0.10.0 - ([080cfe6](https://github.com/its-danny/bevy-nest/commit/080cfe6e1ee36e2f5ff30726e90ac854b674780a)) - Danny Tatom
