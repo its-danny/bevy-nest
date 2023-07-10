@@ -17,10 +17,10 @@ impl Plugin for NestPlugin {
         app.add_event::<Outbox>();
 
         app.add_systems(
-            (handle_incoming, handle_lost, handle_events, handle_inbox)
-                .in_base_set(CoreSet::PreUpdate),
+            PreUpdate,
+            (handle_incoming, handle_lost, handle_events, handle_inbox),
         );
 
-        app.add_system(handle_outbox.in_base_set(CoreSet::Last));
+        app.add_systems(Last, handle_outbox);
     }
 }
