@@ -1,7 +1,9 @@
 use std::time::Duration;
 
+use bevy::app::ScheduleRunnerPlugin;
 use bevy::log::LogPlugin;
-use bevy::{app::ScheduleRunnerSettings, prelude::*};
+use bevy::prelude::*;
+use bevy::time::TimePlugin;
 use bevy_nest::prelude::*;
 
 #[derive(Component)]
@@ -11,7 +13,7 @@ struct Player(ClientId);
 struct WhoTimer(Timer);
 
 fn setup_network(server: Res<Server>) {
-    server.listen("127.0.0.1:3000");
+    server.listen("127.0.0.1:4000");
 }
 
 fn handle_events(
@@ -88,21 +90,19 @@ fn who_online(
 
 fn main() {
     App::new()
-        .insert_resource(ScheduleRunnerSettings::run_loop(Duration::from_secs_f64(
-            1.0 / 60.0,
-        )))
         .insert_resource(WhoTimer(Timer::new(
             Duration::from_secs(3),
             TimerMode::Repeating,
         )))
-        .add_plugins(MinimalPlugins)
-        .add_plugin(LogPlugin {
-            ..Default::default()
-        })
-        .add_plugin(NestPlugin)
-        .add_startup_system(setup_network)
-        .add_system(handle_events)
-        .add_system(handle_messages)
-        .add_system(who_online)
+        .add_plugins((
+            LogPlugin::default(),
+            TaskPoolPlugin::default(),
+            TypeRegistrationPlugin::default(),
+            TimePlugin::default(),
+            ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(1.0 / 60.0)),
+            NestPlugin,
+        ))
+        .add_systems(Startup, setup_network)
+        .add_systems(Update, (handle_events, handle_messages, who_online))
         .run();
 }

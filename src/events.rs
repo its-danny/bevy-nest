@@ -1,7 +1,7 @@
 use crate::errors::NetworkError;
 use crate::server::ClientId;
 
-use bevy::prelude::EventWriter;
+use bevy::prelude::*;
 use tokio::net::TcpStream;
 
 #[derive(Debug)]
@@ -9,7 +9,7 @@ pub(crate) struct IncomingConnection {
     pub(crate) socket: TcpStream,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Event)]
 pub enum NetworkEvent {
     Connected(ClientId),
     Disconnected(ClientId),
@@ -83,7 +83,7 @@ impl From<Payload> for Message {
 ///     }
 /// }
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Event)]
 pub struct Inbox {
     pub from: ClientId,
     pub content: Message,
@@ -113,7 +113,7 @@ pub struct Inbox {
 ///     }
 /// }
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Event)]
 pub struct Outbox {
     pub to: ClientId,
     pub content: Message,
