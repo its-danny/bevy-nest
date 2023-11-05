@@ -14,6 +14,7 @@
 | :----: | :---------: |
 |  0.10  |     0.1     |
 |  0.11  |     0.2     |
+|  0.12  |     0.3     |
 
 ## Installation
 
@@ -27,7 +28,7 @@ bevy-nest = "0.1"
 
 - Dive right into the [docs](https://docs.rs/crate/bevy-nest).
 - See the [`examples/`](https://github.com/its-danny/bevy-nest/blob/main/examples) directory for a simple chat server.
-- To see it in action, check out [Aureus](https://github.com/its-danny/aureus).
+- To see it in action, check out [Kindara](https://github.com/its-danny/kindara).
 
 ## License
 

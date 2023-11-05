@@ -22,7 +22,7 @@ fn handle_events(
     mut outbox: EventWriter<Outbox>,
     players: Query<(Entity, &Player)>,
 ) {
-    for event in events.iter() {
+    for event in events.read() {
         match event {
             NetworkEvent::Connected(id) => {
                 commands.spawn(Player(*id));
@@ -54,7 +54,7 @@ fn handle_messages(
     mut outbox: EventWriter<Outbox>,
     players: Query<(Entity, &Player)>,
 ) {
-    for message in inbox.iter() {
+    for message in inbox.read() {
         if let Message::Text(text) = &message.content {
             for (_, player) in players.iter() {
                 outbox.send_text(player.0, format!("{:?}: {text}", message.from));

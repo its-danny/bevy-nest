@@ -42,7 +42,7 @@ pub(crate) fn handle_inbox(server: Res<Server>, mut inbox: EventWriter<Inbox>) {
 
 // Retrieve messages from Bevy and send them to the server.
 pub(crate) fn handle_outbox(server: Res<Server>, mut outbox: EventReader<Outbox>) {
-    for out in outbox.iter() {
+    for out in outbox.read() {
         server.send(out);
     }
 }
