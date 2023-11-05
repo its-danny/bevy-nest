@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [0.3.0](https://github.com/its-danny/bevy-nest/compare/0.2.0..0.3.0) - 2023-11-05
+#### Build system
+- **(deps)** update bevy to 0.12 - ([ed7bcf8](https://github.com/its-danny/bevy-nest/commit/ed7bcf8fea5a5be1148c9bcd0103ffad1c3ef556)) - Danny Tatom
+
+- - -
+
 ## [0.2.0](https://github.com/its-danny/bevy-nest/compare/0.1.1..0.2.0) - 2023-07-10
 #### Build system
 - **(deps)** update bevy to 0.11 - ([a95b5f0](https://github.com/its-danny/bevy-nest/commit/a95b5f0110c51c59278181f5e95be93b41fea340)) - Danny Tatom
