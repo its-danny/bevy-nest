@@ -12,16 +12,16 @@
 
 | `bevy` | `bevy-nest` |
 | :----: | :---------: |
-|  0.10  |     0.1     |
-|  0.11  |     0.2     |
 |  0.12  |     0.3     |
+|  0.11  |     0.2     |
+|  0.10  |     0.1     |
 
 ## Installation
 
 Add `bevy-nest` to your `Cargo.toml`:
 
 ```toml
-bevy-nest = "0.1"
+bevy-nest = "0.3"
 ```
 
 ## Usage
