@@ -28,7 +28,6 @@ bevy-nest = "0.3"
 
 - Dive right into the [docs](https://docs.rs/crate/bevy-nest).
 - See the [`examples/`](https://github.com/its-danny/bevy-nest/blob/main/examples) directory for a simple chat server.
-- To see it in action, check out [Kindara](https://github.com/its-danny/kindara).
 
 ## License
 
