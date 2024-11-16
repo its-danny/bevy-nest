@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use bevy::{prelude::*, utils::Uuid};
+use bevy::prelude::*;
 use dashmap::DashMap;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -8,6 +8,7 @@ use tokio::{
     runtime::{Builder, Runtime},
     task::JoinHandle,
 };
+use uuid::Uuid;
 
 use crate::{
     channel::Channel,

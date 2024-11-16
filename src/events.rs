@@ -78,7 +78,7 @@ impl From<Payload> for Message {
 /// use bevy_nest::prelude::*;
 ///
 /// fn read_inbox(mut inbox: EventReader<Inbox>) {
-///     for message in inbox.iter() {
+///     for message in inbox.read() {
 ///         // ...
 ///     }
 /// }
@@ -97,7 +97,7 @@ pub struct Inbox {
 /// use bevy_nest::prelude::*;
 ///
 /// fn ping_pong(mut inbox: EventReader<Inbox>, mut outbox: EventWriter<Outbox>) {
-///     for message in inbox.iter() {
+///     for message in inbox.read() {
 ///         if let Message::Text(content) = &message.content {
 ///             if content == "ping" {
 ///                 // There are a few ways to send messages to the outbox:
@@ -132,7 +132,7 @@ impl OutboxWriterExt for EventWriter<'_, Outbox> {
         self.send(Outbox {
             to,
             content: Message::Text(text.into()),
-        })
+        });
     }
 
     /// Sends a [`Message::Command`] to a client.
@@ -140,7 +140,7 @@ impl OutboxWriterExt for EventWriter<'_, Outbox> {
         self.send(Outbox {
             to,
             content: Message::Command(command.into()),
-        })
+        });
     }
 
     /// Sends a [`Message::GMCP`] to a client.
@@ -148,6 +148,6 @@ impl OutboxWriterExt for EventWriter<'_, Outbox> {
         self.send(Outbox {
             to,
             content: Message::GMCP(payload),
-        })
+        });
     }
 }

@@ -12,6 +12,7 @@
 
 | `bevy` | `bevy-nest` |
 | :----: | :---------: |
+|  0.14  |     0.4     |
 |  0.12  |     0.3     |
 |  0.11  |     0.2     |
 |  0.10  |     0.1     |
@@ -21,7 +22,7 @@
 Add `bevy-nest` to your `Cargo.toml`:
 
 ```toml
-bevy-nest = "0.3"
+bevy-nest = "0.4"
 ```
 
 ## Usage
