@@ -97,8 +97,8 @@ fn main() {
         .add_plugins((
             LogPlugin::default(),
             TaskPoolPlugin::default(),
-            TypeRegistrationPlugin::default(),
-            TimePlugin::default(),
+            TypeRegistrationPlugin,
+            TimePlugin,
             ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(1.0 / 60.0)),
             NestPlugin,
         ))

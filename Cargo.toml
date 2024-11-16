@@ -9,11 +9,12 @@ license = "MIT OR Apache-2.0"
 keywords = ["gamedev", "bevy", "networking", "telnet", "mud"]
 
 [dependencies]
-bevy = { version = "0.12", default-features = false }
+bevy = { version = "0.14", default-features = false }
 crossbeam-channel = "0.5"
-dashmap = "5.5"
-thiserror = "1.0"
+dashmap = "6.1"
+thiserror = "2.0"
 tokio = { version = "1.33", features = ["io-util", "net", "rt-multi-thread"] }
+uuid = { version = "1.11.0", features = ["v4"] }
 
 [dev-dependencies]
 rusty-hook = "0.11"
