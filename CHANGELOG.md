@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [0.5.0](https://github.com/its-danny/bevy-nest/compare/18a76a48e105de446d657d4dfc8b410c07b84c5a..0.5.0) - 2025-01-20
+#### Miscellaneous Chores
+- update bevy to 0.15 - ([18a76a4](https://github.com/its-danny/bevy-nest/commit/18a76a48e105de446d657d4dfc8b410c07b84c5a)) - Danny Tatom
+
+- - -
+
 ## [0.4.0](https://github.com/its-danny/bevy-nest/compare/0008b188598cc1bf3bbaa00f563b112090a7a322..0.4.0) - 2024-11-16
 #### Documentation
 - **(readme)** rip kindara - ([5d77876](https://github.com/its-danny/bevy-nest/commit/5d778767569709705e9dee1f166daf4db9e55a57)) - Danny
