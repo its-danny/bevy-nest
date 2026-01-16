@@ -2,6 +2,13 @@ use std::sync::Arc;
 
 use bevy::prelude::*;
 use dashmap::DashMap;
+use libmudtelnet_rs::{
+    Parser,
+    compatibility::{CompatibilityEntry, CompatibilityTable},
+    events::{TelnetEvents, TelnetIAC},
+    telnet::{op_command, op_option},
+};
+use tokio::sync::Mutex;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, ToSocketAddrs},
@@ -12,9 +19,9 @@ use uuid::Uuid;
 
 use crate::{
     channel::Channel,
+    config::NestConfig,
     errors::NetworkError,
-    events::{Frame, Inbox, IncomingConnection, NetworkEvent, Outbox},
-    telnet::*,
+    events::{Frame, Inbox, IncomingConnection, NetworkEvent, Outbox, Payload},
 };
 
 /// A unique identifier for a client.
@@ -45,6 +52,7 @@ struct Client {
 pub struct Server {
     runtime: Runtime,
     clients: Arc<DashMap<ClientId, Client>>,
+    config: NestConfig,
     // Incoming connections.
     pub(crate) incoming: Channel<IncomingConnection>,
     // Recently disconnected clients.
@@ -56,7 +64,7 @@ pub struct Server {
 }
 
 impl Server {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new(config: NestConfig) -> Self {
         Self {
             runtime: Builder::new_multi_thread()
                 .enable_io()
@@ -67,6 +75,7 @@ impl Server {
             lost: Channel::new(),
             events: Channel::new(),
             inbox: Channel::new(),
+            config,
         }
     }
 
@@ -123,15 +132,33 @@ impl Server {
     }
 
     pub(crate) fn setup_client(&self, connection: IncomingConnection) {
-        let (mut read_socket, mut write_socket) = connection.socket.into_split();
+        let (read_socket, mut write_socket) = connection.socket.into_split();
 
         let id = ClientId::new();
         let outbox: Channel<Outbox> = Channel::new();
+
+        let parser: Arc<Mutex<Parser>> = if self.config.enable_gmcp {
+            let mut table = CompatibilityTable::new();
+
+            table.set_option(
+                op_option::GMCP,
+                CompatibilityEntry::new(true, true, false, false),
+            );
+
+            Arc::new(Mutex::new(Parser::with_support(table)))
+        } else {
+            Arc::new(Mutex::new(Parser::new()))
+        };
+
+        let read_parser: Arc<Mutex<Parser>> = Arc::clone(&parser);
+        let write_parser: Arc<Mutex<Parser>> = Arc::clone(&parser);
+        let config = self.config.clone();
 
         let read_events_sender = self.events.sender.clone();
         let write_events_sender = self.events.sender.clone();
         let inbox_sender = self.inbox.sender.clone();
         let outbox_receiver = outbox.receiver.clone();
+        let outbox_sender = outbox.sender.clone();
         let lost_sender = self.lost.sender.clone();
 
         self.clients.insert(
@@ -140,123 +167,190 @@ impl Server {
                 outbox,
                 // Spawn a new task to read from the socket.
                 // Messages received are sent to the server's inbox.
-                read_task: self.runtime.spawn(async move {
-                    // Create a buffer to read data into.
-                    let max_packet_size = 1024;
-                    let mut buffer = vec![0; max_packet_size];
+                read_task: self.runtime.spawn({
+                    let parser = read_parser;
+                    let config = config.clone();
 
-                    info!("Starting read task for {id:?}");
+                    async move {
+                        let mut read_socket = read_socket;
+                        let max_packet_size = 2048;
+                        let mut buffer = vec![0; max_packet_size];
 
-                    loop {
-                        // Read data from the socket.
-                        let length = match read_socket.read(&mut buffer).await {
-                            Ok(n) => n,
-                            Err(err) => {
-                                if let Err(err) = read_events_sender
-                                    .send(NetworkEvent::Error(NetworkError::SocketRead(err, id)))
-                                {
-                                    error!("Could not send error: {err}");
-                                };
+                        info!("Starting read task for {id:?}");
+
+                        loop {
+                            let length = match read_socket.read(&mut buffer).await {
+                                Ok(n) => n,
+                                Err(err) => {
+                                    if let Err(err) = read_events_sender.send(NetworkEvent::Error(
+                                        NetworkError::SocketRead(err, id),
+                                    )) {
+                                        error!("Could not send error: {err}");
+                                    };
+
+                                    break;
+                                }
+                            };
+
+                            if length == 0 {
+                                if let Err(err) = lost_sender.send(id) {
+                                    error!("Could not send lost connection: {err}");
+                                }
 
                                 break;
                             }
-                        };
 
-                        // If the length is 0, the socket has been closed.
-                        if length == 0 {
-                            if let Err(err) = lost_sender.send(id) {
-                                error!("Could not send lost connection: {err}");
-                            }
+                            let mut parser = parser.lock().await;
+                            let events = parser.receive(&buffer[..length]);
+                            drop(parser);
 
-                            break;
-                        }
+                            for event in events {
+                                match event {
+                                    TelnetEvents::DataReceive(buf) => {
+                                        let text = String::from_utf8_lossy(&buf).into_owned();
 
-                        if buffer[0] == 255 {
-                            // This is a command because the first byte is 255.
-                            // See: https://users.cs.cf.ac.uk/Dave.Marshall/Internet/node141.html
-                            if let Err(error) = inbox_sender.send(Inbox {
-                                from: id,
-                                content: Frame::Command(buffer[..length].to_vec()),
-                            }) {
-                                error!("Could not send to inbox: {error}");
-                            }
-                        } else {
-                            // Convert the buffer into a string.
-                            let clean = std::str::from_utf8(&buffer[..length]).unwrap_or("").trim();
-
-                            // Send the frame to the inbox.
-                            if !clean.is_empty()
-                                && let Err(error) = inbox_sender.send(Inbox {
-                                    from: id,
-                                    content: Frame::Text(clean.into()),
-                                })
-                            {
-                                error!("Could not send to inbox: {error}");
+                                        if let Err(error) = inbox_sender.send(Inbox {
+                                            from: id,
+                                            content: Frame::Text(text),
+                                        }) {
+                                            error!("Could not send to inbox: {error}");
+                                        }
+                                    }
+                                    TelnetEvents::Negotiation(negotiation) => {
+                                        if !(config.enable_gmcp
+                                            && negotiation.option == op_option::GMCP)
+                                            && let Err(error) = inbox_sender.send(Inbox {
+                                                from: id,
+                                                content: Frame::Negotiation {
+                                                    command: negotiation.command,
+                                                    option: negotiation.option,
+                                                },
+                                            })
+                                        {
+                                            error!("Could not send to inbox: {error}");
+                                        }
+                                    }
+                                    TelnetEvents::Subnegotiation(sub) => {
+                                        if sub.option == op_option::GMCP
+                                            && let Some(frame) =
+                                                parse_gmcp(sub.buffer.to_vec()).map(Frame::GMCP)
+                                            && let Err(error) = inbox_sender.send(Inbox {
+                                                from: id,
+                                                content: frame,
+                                            })
+                                        {
+                                            error!("Could not send GMCP to inbox: {error}");
+                                        } else if let Err(error) = inbox_sender.send(Inbox {
+                                            from: id,
+                                            content: Frame::Subnegotiation {
+                                                option: sub.option,
+                                                data: sub.buffer.to_vec(),
+                                            },
+                                        }) {
+                                            error!(
+                                                "Could not send subnegotiation to inbox: {error}"
+                                            );
+                                        }
+                                    }
+                                    TelnetEvents::IAC(TelnetIAC { command }) => {
+                                        let _ = inbox_sender.send(Inbox {
+                                            from: id,
+                                            content: Frame::IAC(command),
+                                        });
+                                    }
+                                    TelnetEvents::DataSend(bytes) => {
+                                        if let Err(err) = outbox_sender.send(Outbox {
+                                            to: id,
+                                            content: Frame::Raw(bytes.to_vec()),
+                                        }) {
+                                            error!("Could not forward parser DataSend: {err}");
+                                        }
+                                    }
+                                    TelnetEvents::DecompressImmediate(_bytes) => {
+                                        // MCCP not supported; drop.
+                                    }
+                                    _ => {}
+                                }
                             }
                         }
                     }
                 }),
-                write_task: self.runtime.spawn(async move {
-                    // Iterate over frames received from the outbox
-                    // and write them to the socket.
-                    while let Ok(out) = outbox_receiver.recv() {
-                        match out.content {
-                            Frame::Text(text) => {
-                                if let Err(err) =
-                                    write_socket.write_all((text + "\r\n").as_bytes()).await
-                                {
-                                    if let Err(err) = write_events_sender.send(NetworkEvent::Error(
-                                        NetworkError::SocketWrite(err, out.to),
-                                    )) {
-                                        error!("Could not send error: {err}");
-                                    };
+                write_task: self.runtime.spawn({
+                    let parser = write_parser;
 
-                                    break;
+                    async move {
+                        while let Ok(out) = outbox_receiver.recv() {
+                            let result = match out.content {
+                                Frame::Text(text) => {
+                                    let mut parser = parser.lock().await;
+                                    let event = parser.send_text(&text);
+                                    drop(parser);
+                                    write_event(event, &mut write_socket).await
                                 }
-                            }
-                            Frame::Command(command) => {
-                                if let Err(err) = write_socket.write_all(command.as_slice()).await {
-                                    if let Err(err) = write_events_sender.send(NetworkEvent::Error(
-                                        NetworkError::SocketWrite(err, out.to),
-                                    )) {
-                                        error!("Could not send error: {err}");
-                                    };
-
-                                    break;
+                                Frame::GMCP(payload) => {
+                                    let gmcp_string = format_gmcp(&payload);
+                                    let mut parser = parser.lock().await;
+                                    let event =
+                                        parser.subnegotiation_text(op_option::GMCP, &gmcp_string);
+                                    drop(parser);
+                                    if let Some(event) = event {
+                                        write_event(event, &mut write_socket).await
+                                    } else {
+                                        Ok(())
+                                    }
                                 }
-                            }
-                            Frame::GMCP(payload) => {
-                                let mut seq = vec![IAC, SB, GMCP];
-
-                                seq.extend(payload.package.as_bytes());
-
-                                if let Some(subpackage) = payload.subpackage {
-                                    seq.push(b'.');
-                                    seq.extend(subpackage.as_bytes());
+                                Frame::Negotiation { command, option } => {
+                                    let mut parser = parser.lock().await;
+                                    let event = parser.negotiate(command, option);
+                                    drop(parser);
+                                    write_event(event, &mut write_socket).await
                                 }
-
-                                if let Some(data) = payload.data {
-                                    seq.push(b' ');
-                                    seq.extend(data.as_bytes());
+                                Frame::Subnegotiation { option, data } => {
+                                    let mut parser = parser.lock().await;
+                                    let event = parser.subnegotiation(option, data);
+                                    drop(parser);
+                                    if let Some(event) = event {
+                                        write_event(event, &mut write_socket).await
+                                    } else {
+                                        Ok(())
+                                    }
                                 }
-
-                                seq.extend(vec![IAC, SE]);
-
-                                if let Err(err) = write_socket.write_all(seq.as_slice()).await {
-                                    if let Err(err) = write_events_sender.send(NetworkEvent::Error(
-                                        NetworkError::SocketWrite(err, out.to),
-                                    )) {
-                                        error!("Could not send error: {err}");
-                                    };
-
-                                    break;
+                                Frame::Raw(command) => {
+                                    write_socket.write_all(command.as_slice()).await
                                 }
+                                Frame::IAC(command) => write_socket.write_all(&[command]).await,
+                            };
+
+                            if let Err(err) = result {
+                                if let Err(err) = write_events_sender.send(NetworkEvent::Error(
+                                    NetworkError::SocketWrite(err, out.to),
+                                )) {
+                                    error!("Could not send error: {err}");
+                                };
+
+                                break;
                             }
                         }
                     }
                 }),
             },
         );
+
+        if self.config.enable_gmcp {
+            let _ = self.clients.get(&id).and_then(|client| {
+                client
+                    .outbox
+                    .sender
+                    .send(Outbox {
+                        to: id,
+                        content: Frame::Negotiation {
+                            command: op_command::WILL,
+                            option: op_option::GMCP,
+                        },
+                    })
+                    .err()
+            });
+        }
 
         if let Err(err) = self.events.sender.send(NetworkEvent::Connected(id)) {
             error!("Could not send connected event: {err}");
@@ -276,37 +370,60 @@ impl Server {
 
     /// Send a frame to a client's outbox.
     pub(crate) fn send(&self, out: &Outbox) {
-        match &out.content {
-            Frame::Text(text) => {
-                if let Some(client) = self.clients.get(&out.to)
-                    && let Err(err) = client.outbox.sender.send(Outbox {
-                        to: out.to,
-                        content: Frame::Text(text.clone()),
-                    })
-                {
-                    error!("Could not send frame: {err}");
-                }
-            }
-            Frame::Command(command) => {
-                if let Some(client) = self.clients.get(&out.to)
-                    && let Err(err) = client.outbox.sender.send(Outbox {
-                        to: out.to,
-                        content: Frame::Command(command.clone()),
-                    })
-                {
-                    error!("Could not send frame: {err}");
-                }
-            }
-            Frame::GMCP(payload) => {
-                if let Some(client) = self.clients.get(&out.to)
-                    && let Err(err) = client.outbox.sender.send(Outbox {
-                        to: out.to,
-                        content: Frame::GMCP(payload.clone()),
-                    })
-                {
-                    error!("Could not send frame: {err}");
-                }
-            }
+        if let Some(client) = self.clients.get(&out.to)
+            && let Err(err) = client.outbox.sender.send(out.clone())
+        {
+            error!("Could not send frame: {err}");
         }
     }
+}
+
+async fn write_event(
+    event: TelnetEvents,
+    write_socket: &mut tokio::net::tcp::OwnedWriteHalf,
+) -> Result<(), std::io::Error> {
+    match event {
+        TelnetEvents::DataSend(buf) => write_socket.write_all(&buf).await,
+        other => {
+            warn!("Unexpected telnet write event: {other:?}");
+            Ok(())
+        }
+    }
+}
+
+fn format_gmcp(payload: &Payload) -> String {
+    let mut gmcp = payload.package.clone();
+
+    if let Some(sub) = &payload.subpackage {
+        gmcp.push('.');
+        gmcp.push_str(sub);
+    }
+
+    if let Some(data) = &payload.data {
+        gmcp.push(' ');
+        gmcp.push_str(data);
+    }
+
+    gmcp
+}
+
+fn parse_gmcp(buffer: Vec<u8>) -> Option<Payload> {
+    let text = String::from_utf8(buffer).ok()?;
+    let (package_part, data_part) = text.split_once(' ').unwrap_or((text.as_str(), ""));
+
+    let mut parts = package_part.split('.');
+    let package = parts.next()?.to_string();
+    let subpackage = parts.next().map(|s| s.to_string());
+
+    let data = if data_part.is_empty() {
+        None
+    } else {
+        Some(data_part.to_string())
+    };
+
+    Some(Payload {
+        package,
+        subpackage,
+        data,
+    })
 }

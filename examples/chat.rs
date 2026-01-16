@@ -27,8 +27,6 @@ fn handle_events(
             NetworkEvent::Connected(id) => {
                 commands.spawn(Player(*id));
 
-                outbox.write_command(*id, vec![IAC, WILL, GMCP]);
-
                 for (_, player) in players.iter() {
                     outbox.write_text(player.0, format!("{id:?} connected"));
                 }
@@ -56,8 +54,14 @@ fn handle_frames(
 ) {
     for frame in inbox.read() {
         if let Frame::Text(text) = &frame.content {
+            let clean = text.trim_end_matches(['\r', '\n']);
+
+            if clean.is_empty() {
+                continue;
+            }
+
             for (_, player) in players.iter() {
-                outbox.write_text(player.0, format!("{:?}: {text}", frame.from));
+                outbox.write_text(player.0, format!("{:?}: {clean}", frame.from));
             }
         }
     }

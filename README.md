@@ -24,7 +24,7 @@
 Add `bevy-nest` to your `Cargo.toml`:
 
 ```toml
-bevy-nest = "0.4"
+bevy-nest = "0.6"
 ```
 
 ## Usage
