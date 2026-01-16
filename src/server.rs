@@ -266,9 +266,6 @@ impl Server {
                                             error!("Could not forward parser DataSend: {err}");
                                         }
                                     }
-                                    TelnetEvents::DecompressImmediate(_bytes) => {
-                                        // MCCP not supported; drop.
-                                    }
                                     _ => {}
                                 }
                             }

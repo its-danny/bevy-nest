@@ -15,7 +15,4 @@ dashmap = "6.1"
 thiserror = "2.0"
 tokio = { version = "1.49", features = ["io-util", "net", "rt-multi-thread", "sync"] }
 uuid = { version = "1.19", features = ["v4"] }
-libmudtelnet-rs = "2.0.10"
-
-[dev-dependencies]
-rusty-hook = "0.11"
+libmudtelnet-rs = "2.0"
