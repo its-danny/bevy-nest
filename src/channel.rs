@@ -1,4 +1,4 @@
-use crossbeam_channel::{unbounded, Receiver, Sender};
+use crossbeam_channel::{Receiver, Sender, unbounded};
 
 pub(crate) struct Channel<T> {
     pub(crate) sender: Sender<T>,

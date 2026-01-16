@@ -13,7 +13,7 @@ use uuid::Uuid;
 use crate::{
     channel::Channel,
     errors::NetworkError,
-    events::{Inbox, IncomingConnection, Message, NetworkEvent, Outbox},
+    events::{Frame, Inbox, IncomingConnection, NetworkEvent, Outbox},
     telnet::*,
 };
 
@@ -176,7 +176,7 @@ impl Server {
                             // See: https://users.cs.cf.ac.uk/Dave.Marshall/Internet/node141.html
                             if let Err(error) = inbox_sender.send(Inbox {
                                 from: id,
-                                content: Message::Command(buffer[..length].to_vec()),
+                                content: Frame::Command(buffer[..length].to_vec()),
                             }) {
                                 error!("Could not send to inbox: {error}");
                             }
@@ -184,24 +184,24 @@ impl Server {
                             // Convert the buffer into a string.
                             let clean = std::str::from_utf8(&buffer[..length]).unwrap_or("").trim();
 
-                            // Send the message to the inbox.
-                            if !clean.is_empty() {
-                                if let Err(error) = inbox_sender.send(Inbox {
+                            // Send the frame to the inbox.
+                            if !clean.is_empty()
+                                && let Err(error) = inbox_sender.send(Inbox {
                                     from: id,
-                                    content: Message::Text(clean.into()),
-                                }) {
-                                    error!("Could not send to inbox: {error}");
-                                }
+                                    content: Frame::Text(clean.into()),
+                                })
+                            {
+                                error!("Could not send to inbox: {error}");
                             }
                         }
                     }
                 }),
                 write_task: self.runtime.spawn(async move {
-                    // Iterate over messages received from the outbox
+                    // Iterate over frames received from the outbox
                     // and write them to the socket.
                     while let Ok(out) = outbox_receiver.recv() {
                         match out.content {
-                            Message::Text(text) => {
+                            Frame::Text(text) => {
                                 if let Err(err) =
                                     write_socket.write_all((text + "\r\n").as_bytes()).await
                                 {
@@ -214,7 +214,7 @@ impl Server {
                                     break;
                                 }
                             }
-                            Message::Command(command) => {
+                            Frame::Command(command) => {
                                 if let Err(err) = write_socket.write_all(command.as_slice()).await {
                                     if let Err(err) = write_events_sender.send(NetworkEvent::Error(
                                         NetworkError::SocketWrite(err, out.to),
@@ -225,7 +225,7 @@ impl Server {
                                     break;
                                 }
                             }
-                            Message::GMCP(payload) => {
+                            Frame::GMCP(payload) => {
                                 let mut seq = vec![IAC, SB, GMCP];
 
                                 seq.extend(payload.package.as_bytes());
@@ -274,37 +274,37 @@ impl Server {
         }
     }
 
-    /// Send a message to a client's outbox.
+    /// Send a frame to a client's outbox.
     pub(crate) fn send(&self, out: &Outbox) {
         match &out.content {
-            Message::Text(text) => {
-                if let Some(client) = self.clients.get(&out.to) {
-                    if let Err(err) = client.outbox.sender.send(Outbox {
+            Frame::Text(text) => {
+                if let Some(client) = self.clients.get(&out.to)
+                    && let Err(err) = client.outbox.sender.send(Outbox {
                         to: out.to,
-                        content: Message::Text(text.clone()),
-                    }) {
-                        error!("Could not send message: {err}");
-                    }
+                        content: Frame::Text(text.clone()),
+                    })
+                {
+                    error!("Could not send frame: {err}");
                 }
             }
-            Message::Command(command) => {
-                if let Some(client) = self.clients.get(&out.to) {
-                    if let Err(err) = client.outbox.sender.send(Outbox {
+            Frame::Command(command) => {
+                if let Some(client) = self.clients.get(&out.to)
+                    && let Err(err) = client.outbox.sender.send(Outbox {
                         to: out.to,
-                        content: Message::Command(command.clone()),
-                    }) {
-                        error!("Could not send message: {err}");
-                    }
+                        content: Frame::Command(command.clone()),
+                    })
+                {
+                    error!("Could not send frame: {err}");
                 }
             }
-            Message::GMCP(payload) => {
-                if let Some(client) = self.clients.get(&out.to) {
-                    if let Err(err) = client.outbox.sender.send(Outbox {
+            Frame::GMCP(payload) => {
+                if let Some(client) = self.clients.get(&out.to)
+                    && let Err(err) = client.outbox.sender.send(Outbox {
                         to: out.to,
-                        content: Message::GMCP(payload.clone()),
-                    }) {
-                        error!("Could not send message: {err}");
-                    }
+                        content: Frame::GMCP(payload.clone()),
+                    })
+                {
+                    error!("Could not send frame: {err}");
                 }
             }
         }
