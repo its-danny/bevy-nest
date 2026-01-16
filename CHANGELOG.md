@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [0.6.0](https://github.com/its-danny/bevy-nest/compare/85ff24e7c8ebed43ce76453c842bc141b1b7f9ec..0.6.0) - 2026-01-16
+#### Miscellaneous Chores
+- update bevy to 0.18 - ([85ff24e](https://github.com/its-danny/bevy-nest/commit/85ff24e7c8ebed43ce76453c842bc141b1b7f9ec)) - Danny Tatom
+
+- - -
+
 ## [0.5.0](https://github.com/its-danny/bevy-nest/compare/18a76a48e105de446d657d4dfc8b410c07b84c5a..0.5.0) - 2025-01-20
 #### Miscellaneous Chores
 - update bevy to 0.15 - ([18a76a4](https://github.com/its-danny/bevy-nest/commit/18a76a48e105de446d657d4dfc8b410c07b84c5a)) - Danny Tatom
