@@ -26,20 +26,20 @@ pub struct Payload {
 
 /// A frame representing an application-level telnet message exchanged
 /// between the server and a client.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Frame {
-    /// Text frame; appended with a newline when sent to the client.
+    /// Text frame; CRLF is handled by the telnet parser.
     Text(String),
-    /// Telnet command bytes. You can use the constants in the
-    /// [`telnet`](crate::telnet) module to make things easier.
-    ///
-    /// See: <https://users.cs.cf.ac.uk/Dave.Marshall/Internet/node141.html>
-    Command(Vec<u8>),
-    /// A GMCP message is a JSON object serialized into a string. The GMCP
-    /// protocol is used to send structured data to the client.
-    ///
-    /// See: <https://www.gammon.com.au/gmcp>
+    /// A GMCP message is a JSON object serialized into a string.
     GMCP(Payload),
+    /// Negotiation command/option pair (WILL/WONT/DO/DONT).
+    Negotiation { command: u8, option: u8 },
+    /// Subnegotiation payload for a given option.
+    Subnegotiation { option: u8, data: Vec<u8> },
+    /// Raw bytes to send untouched (already telnet-framed).
+    Raw(Vec<u8>),
+    /// Low-level IAC command emitted by the parser.
+    IAC(u8),
 }
 
 /// Backwards compatibility alias for the old `Message` name.
@@ -61,9 +61,9 @@ impl From<String> for Frame {
 }
 
 impl From<Vec<u8>> for Frame {
-    /// Convert a vector of bytes into a [`Frame::Command`].
+    /// Convert a vector of bytes into a [`Frame::Raw`].
     fn from(v: Vec<u8>) -> Self {
-        Frame::Command(v)
+        Frame::Raw(v)
     }
 }
 
@@ -87,7 +87,7 @@ impl From<Payload> for Frame {
 ///     }
 /// }
 /// ```
-#[derive(Debug, Event, Message)]
+#[derive(Debug, Event, Message, Clone)]
 pub struct Inbox {
     pub from: ClientId,
     pub content: Frame,
@@ -104,20 +104,13 @@ pub struct Inbox {
 ///     for frame in inbox.read() {
 ///         if let Frame::Text(content) = &frame.content {
 ///             if content == "ping" {
-///                 // There are a few ways to send frames to the outbox:
-///                 // 1. Build the frame and send it to the outbox.
-///                 outbox.write(Outbox { to: frame.from, content: Frame::Text("pong!".into()) });
-///                 // 2. Use the From trait, which is implemented for &str, String, Vec<u8>, and Payload
-///                 // for creating text, commands, and GMCP payloads respectively.
-///                 outbox.write(Outbox { to: frame.from, content: "pong!".into() });
-///                 // 3. Use the extension trait OutboxWriterExt, which provides convenience methods.
 ///                 outbox.write_text(frame.from, "pong!");
 ///             }
 ///         }
 ///     }
 /// }
 /// ```
-#[derive(Debug, Event, Message)]
+#[derive(Debug, Event, Message, Clone)]
 pub struct Outbox {
     pub to: ClientId,
     pub content: Frame,
@@ -126,8 +119,10 @@ pub struct Outbox {
 /// Extension trait for [`MessageWriter<Outbox>`] to make sending frames easier.
 pub trait OutboxWriterExt {
     fn write_text(&mut self, to: ClientId, text: impl Into<String>);
-    fn write_command(&mut self, to: ClientId, command: impl Into<Vec<u8>>);
     fn write_gmcp(&mut self, to: ClientId, payload: Payload);
+    fn write_negotiation(&mut self, to: ClientId, command: u8, option: u8);
+    fn write_subnegotiation(&mut self, to: ClientId, option: u8, data: impl Into<Vec<u8>>);
+    fn write_raw(&mut self, to: ClientId, data: impl Into<Vec<u8>>);
 }
 
 impl OutboxWriterExt for MessageWriter<'_, Outbox> {
@@ -139,19 +134,38 @@ impl OutboxWriterExt for MessageWriter<'_, Outbox> {
         });
     }
 
-    /// Sends a [`Frame::Command`] to a client.
-    fn write_command(&mut self, to: ClientId, command: impl Into<Vec<u8>>) {
-        self.write(Outbox {
-            to,
-            content: Frame::Command(command.into()),
-        });
-    }
-
     /// Sends a [`Frame::GMCP`] to a client.
     fn write_gmcp(&mut self, to: ClientId, payload: Payload) {
         self.write(Outbox {
             to,
             content: Frame::GMCP(payload),
+        });
+    }
+
+    /// Sends a negotiation frame (WILL/WONT/DO/DONT).
+    fn write_negotiation(&mut self, to: ClientId, command: u8, option: u8) {
+        self.write(Outbox {
+            to,
+            content: Frame::Negotiation { command, option },
+        });
+    }
+
+    /// Sends a subnegotiation payload for an option.
+    fn write_subnegotiation(&mut self, to: ClientId, option: u8, data: impl Into<Vec<u8>>) {
+        self.write(Outbox {
+            to,
+            content: Frame::Subnegotiation {
+                option,
+                data: data.into(),
+            },
+        });
+    }
+
+    /// Sends raw bytes that are assumed already telnet-framed/escaped.
+    fn write_raw(&mut self, to: ClientId, data: impl Into<Vec<u8>>) {
+        self.write(Outbox {
+            to,
+            content: Frame::Raw(data.into()),
         });
     }
 }
