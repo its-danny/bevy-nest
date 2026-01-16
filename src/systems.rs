@@ -23,25 +23,25 @@ pub(crate) fn handle_lost(server: Res<Server>) {
 }
 
 // Retrieve events from the server and send them to Bevy.
-pub(crate) fn handle_events(server: Res<Server>, mut events: EventWriter<NetworkEvent>) {
+pub(crate) fn handle_events(server: Res<Server>, mut events: MessageWriter<NetworkEvent>) {
     for event in server.events.receiver.try_iter() {
         info!("Handling event: {event:?}");
 
-        events.send(event);
+        events.write(event);
     }
 }
 
-// Retrieve messages from the server and send them to Bevy.
-pub(crate) fn handle_inbox(server: Res<Server>, mut inbox: EventWriter<Inbox>) {
-    for message in server.inbox.receiver.try_iter() {
-        info!("Handling inbox message: {message:?}");
+// Retrieve frames from the server and send them to Bevy.
+pub(crate) fn handle_inbox(server: Res<Server>, mut inbox: MessageWriter<Inbox>) {
+    for frame in server.inbox.receiver.try_iter() {
+        info!("Handling inbox frame: {frame:?}");
 
-        inbox.send(message);
+        inbox.write(frame);
     }
 }
 
-// Retrieve messages from Bevy and send them to the server.
-pub(crate) fn handle_outbox(server: Res<Server>, mut outbox: EventReader<Outbox>) {
+// Retrieve frames from Bevy and send them to the server.
+pub(crate) fn handle_outbox(server: Res<Server>, mut outbox: MessageReader<Outbox>) {
     for out in outbox.read() {
         server.send(out);
     }

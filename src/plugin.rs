@@ -12,9 +12,9 @@ impl Plugin for NestPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(Server::new());
 
-        app.add_event::<NetworkEvent>();
-        app.add_event::<Inbox>();
-        app.add_event::<Outbox>();
+        app.add_message::<NetworkEvent>();
+        app.add_message::<Inbox>();
+        app.add_message::<Outbox>();
 
         app.add_systems(
             PreUpdate,

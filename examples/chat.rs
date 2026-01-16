@@ -18,8 +18,8 @@ fn setup_network(server: Res<Server>) {
 
 fn handle_events(
     mut commands: Commands,
-    mut events: EventReader<NetworkEvent>,
-    mut outbox: EventWriter<Outbox>,
+    mut events: MessageReader<NetworkEvent>,
+    mut outbox: MessageWriter<Outbox>,
     players: Query<(Entity, &Player)>,
 ) {
     for event in events.read() {
@@ -27,10 +27,10 @@ fn handle_events(
             NetworkEvent::Connected(id) => {
                 commands.spawn(Player(*id));
 
-                outbox.send_command(*id, vec![IAC, WILL, GMCP]);
+                outbox.write_command(*id, vec![IAC, WILL, GMCP]);
 
                 for (_, player) in players.iter() {
-                    outbox.send_text(player.0, format!("{id:?} connected"));
+                    outbox.write_text(player.0, format!("{id:?} connected"));
                 }
             }
             NetworkEvent::Disconnected(id) => {
@@ -38,7 +38,7 @@ fn handle_events(
                     commands.entity(entity).despawn();
 
                     for (_, player) in players.iter() {
-                        outbox.send_text(player.0, format!("{id:?} disconnected"));
+                        outbox.write_text(player.0, format!("{id:?} disconnected"));
                     }
                 }
             }
@@ -49,15 +49,15 @@ fn handle_events(
     }
 }
 
-fn handle_messages(
-    mut inbox: EventReader<Inbox>,
-    mut outbox: EventWriter<Outbox>,
+fn handle_frames(
+    mut inbox: MessageReader<Inbox>,
+    mut outbox: MessageWriter<Outbox>,
     players: Query<(Entity, &Player)>,
 ) {
-    for message in inbox.read() {
-        if let Message::Text(text) = &message.content {
+    for frame in inbox.read() {
+        if let Frame::Text(text) = &frame.content {
             for (_, player) in players.iter() {
-                outbox.send_text(player.0, format!("{:?}: {text}", message.from));
+                outbox.write_text(player.0, format!("{:?}: {text}", frame.from));
             }
         }
     }
@@ -78,12 +78,12 @@ impl From<OnlineCount> for Payload {
 fn who_online(
     time: Res<Time>,
     mut who_timer: ResMut<WhoTimer>,
-    mut outbox: EventWriter<Outbox>,
+    mut outbox: MessageWriter<Outbox>,
     players: Query<&Player>,
 ) {
     if who_timer.0.tick(time.delta()).just_finished() {
         for player in players.iter() {
-            outbox.send_gmcp(player.0, OnlineCount(players.iter().len()).into());
+            outbox.write_gmcp(player.0, OnlineCount(players.iter().len()).into());
         }
     }
 }
@@ -97,12 +97,11 @@ fn main() {
         .add_plugins((
             LogPlugin::default(),
             TaskPoolPlugin::default(),
-            TypeRegistrationPlugin,
             TimePlugin,
             ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(1.0 / 60.0)),
             NestPlugin,
         ))
         .add_systems(Startup, setup_network)
-        .add_systems(Update, (handle_events, handle_messages, who_online))
+        .add_systems(Update, (handle_events, handle_frames, who_online))
         .run();
 }

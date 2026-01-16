@@ -9,7 +9,7 @@ pub(crate) struct IncomingConnection {
     pub(crate) socket: TcpStream,
 }
 
-#[derive(Debug, Event)]
+#[derive(Debug, Event, Message)]
 pub enum NetworkEvent {
     Connected(ClientId),
     Disconnected(ClientId),
@@ -24,14 +24,14 @@ pub struct Payload {
     pub data: Option<String>,
 }
 
-/// A message sent from the server to a client or vice versa.
+/// A frame representing an application-level telnet message exchanged
+/// between the server and a client.
 #[derive(Debug)]
-pub enum Message {
-    /// Just your regular text message. This is appended with a newline when sent
-    /// to the client.
+pub enum Frame {
+    /// Text frame; appended with a newline when sent to the client.
     Text(String),
-    /// A command is a sequence of bytes used by the telnet protocol. You can use
-    /// the constants in the [`telnet`](crate::telnet) module to make things easier.
+    /// Telnet command bytes. You can use the constants in the
+    /// [`telnet`](crate::telnet) module to make things easier.
     ///
     /// See: <https://users.cs.cf.ac.uk/Dave.Marshall/Internet/node141.html>
     Command(Vec<u8>),
@@ -42,112 +42,116 @@ pub enum Message {
     GMCP(Payload),
 }
 
-impl From<&str> for Message {
-    /// Convert a string slice into a [`Message::Text`].
+/// Backwards compatibility alias for the old `Message` name.
+#[deprecated(note = "bevy renamed events to messages; this crate now calls its payloads Frames.")]
+pub type Message = Frame;
+
+impl From<&str> for Frame {
+    /// Convert a string slice into a [`Frame::Text`].
     fn from(s: &str) -> Self {
-        Message::Text(s.into())
+        Frame::Text(s.into())
     }
 }
 
-impl From<String> for Message {
-    /// Convert a string into a [`Message::Text`].
+impl From<String> for Frame {
+    /// Convert a string into a [`Frame::Text`].
     fn from(s: String) -> Self {
-        Message::Text(s)
+        Frame::Text(s)
     }
 }
 
-impl From<Vec<u8>> for Message {
-    /// Convert a vector of bytes into a [`Message::Command`].
+impl From<Vec<u8>> for Frame {
+    /// Convert a vector of bytes into a [`Frame::Command`].
     fn from(v: Vec<u8>) -> Self {
-        Message::Command(v)
+        Frame::Command(v)
     }
 }
 
-impl From<Payload> for Message {
-    /// Convert a [`Payload`] object into a [`Message::GMCP`].
+impl From<Payload> for Frame {
+    /// Convert a [`Payload`] object into a [`Frame::GMCP`].
     fn from(payload: Payload) -> Self {
-        Message::GMCP(payload)
+        Frame::GMCP(payload)
     }
 }
 
-/// [`Message`] sent from a client. These are iterated over each
-/// update and sent to Bevy via [`Event<Inbox>`](bevy::ecs::event::Event) to be read over.
+/// [`Frame`]s received from a client. These are iterated each update and sent
+/// to Bevy via [`Event<Inbox>`](bevy::ecs::event::Event) to be read over.
 ///
 /// ```rust
 /// use bevy::prelude::*;
 /// use bevy_nest::prelude::*;
 ///
-/// fn read_inbox(mut inbox: EventReader<Inbox>) {
-///     for message in inbox.read() {
+/// fn read_inbox(mut inbox: MessageReader<Inbox>) {
+///     for frame in inbox.read() {
 ///         // ...
 ///     }
 /// }
 /// ```
-#[derive(Debug, Event)]
+#[derive(Debug, Event, Message)]
 pub struct Inbox {
     pub from: ClientId,
-    pub content: Message,
+    pub content: Frame,
 }
 
-/// [`Message`] sent to a client. These are iterated over each
-/// update by the server and sent to the client's socket.
+/// [`Frame`]s destined for a client. These are iterated each update by the
+/// server and written to the client's socket.
 ///
 /// ```rust
 /// use bevy::prelude::*;
 /// use bevy_nest::prelude::*;
 ///
-/// fn ping_pong(mut inbox: EventReader<Inbox>, mut outbox: EventWriter<Outbox>) {
-///     for message in inbox.read() {
-///         if let Message::Text(content) = &message.content {
+/// fn ping_pong(mut inbox: MessageReader<Inbox>, mut outbox: MessageWriter<Outbox>) {
+///     for frame in inbox.read() {
+///         if let Frame::Text(content) = &frame.content {
 ///             if content == "ping" {
-///                 // There are a few ways to send messages to the outbox:
-///                 // 1. Build the message and send it to the outbox.
-///                 outbox.send(Outbox { to: message.from, content: Message::Text("pong!".into()) });
+///                 // There are a few ways to send frames to the outbox:
+///                 // 1. Build the frame and send it to the outbox.
+///                 outbox.write(Outbox { to: frame.from, content: Frame::Text("pong!".into()) });
 ///                 // 2. Use the From trait, which is implemented for &str, String, Vec<u8>, and Payload
-///                 // for creating text, commands, and GMCP messages respectively.
-///                 outbox.send(Outbox { to: message.from, content: "pong!".into() });
+///                 // for creating text, commands, and GMCP payloads respectively.
+///                 outbox.write(Outbox { to: frame.from, content: "pong!".into() });
 ///                 // 3. Use the extension trait OutboxWriterExt, which provides convenience methods.
-///                 outbox.send_text(message.from, "pong!");
+///                 outbox.write_text(frame.from, "pong!");
 ///             }
 ///         }
 ///     }
 /// }
 /// ```
-#[derive(Debug, Event)]
+#[derive(Debug, Event, Message)]
 pub struct Outbox {
     pub to: ClientId,
-    pub content: Message,
+    pub content: Frame,
 }
 
-/// Extension trait for [`EventWriter<Outbox>`] to make sending messages easier.
+/// Extension trait for [`MessageWriter<Outbox>`] to make sending frames easier.
 pub trait OutboxWriterExt {
-    fn send_text(&mut self, to: ClientId, text: impl Into<String>);
-    fn send_command(&mut self, to: ClientId, command: impl Into<Vec<u8>>);
-    fn send_gmcp(&mut self, to: ClientId, payload: Payload);
+    fn write_text(&mut self, to: ClientId, text: impl Into<String>);
+    fn write_command(&mut self, to: ClientId, command: impl Into<Vec<u8>>);
+    fn write_gmcp(&mut self, to: ClientId, payload: Payload);
 }
 
-impl OutboxWriterExt for EventWriter<'_, Outbox> {
-    /// Sends a [`Message::Text`] to a client.
-    fn send_text(&mut self, to: ClientId, text: impl Into<String>) {
-        self.send(Outbox {
+impl OutboxWriterExt for MessageWriter<'_, Outbox> {
+    /// Sends a [`Frame::Text`] to a client.
+    fn write_text(&mut self, to: ClientId, text: impl Into<String>) {
+        self.write(Outbox {
             to,
-            content: Message::Text(text.into()),
+            content: Frame::Text(text.into()),
         });
     }
 
-    /// Sends a [`Message::Command`] to a client.
-    fn send_command(&mut self, to: ClientId, command: impl Into<Vec<u8>>) {
-        self.send(Outbox {
+    /// Sends a [`Frame::Command`] to a client.
+    fn write_command(&mut self, to: ClientId, command: impl Into<Vec<u8>>) {
+        self.write(Outbox {
             to,
-            content: Message::Command(command.into()),
+            content: Frame::Command(command.into()),
         });
     }
 
-    /// Sends a [`Message::GMCP`] to a client.
-    fn send_gmcp(&mut self, to: ClientId, payload: Payload) {
-        self.send(Outbox {
+    /// Sends a [`Frame::GMCP`] to a client.
+    fn write_gmcp(&mut self, to: ClientId, payload: Payload) {
+        self.write(Outbox {
             to,
-            content: Message::GMCP(payload),
+            content: Frame::GMCP(payload),
         });
     }
 }

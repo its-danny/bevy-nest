@@ -1,20 +1,20 @@
 [package]
 name = "bevy-nest"
 version = "0.5.0"
-edition = "2021"
-authors = ["Danny Tatom <its.danny@hey.com>"]
+edition = "2024"
+authors = ["Danny Tatom <danny@tatom.xyz>"]
 description = "🪹 A telnet plugin for getting MUDdy in Bevy."
 repository = "https://github.com/its-danny/bevy-nest"
 license = "MIT OR Apache-2.0"
 keywords = ["gamedev", "bevy", "networking", "telnet", "mud"]
 
 [dependencies]
-bevy = { version = "0.15", default-features = false }
+bevy = { version = "0.18", default-features = false, features = ["bevy_log"] }
 crossbeam-channel = "0.5"
 dashmap = "6.1"
 thiserror = "2.0"
-tokio = { version = "1.33", features = ["io-util", "net", "rt-multi-thread"] }
-uuid = { version = "1.11.0", features = ["v4"] }
+tokio = { version = "1.49", features = ["io-util", "net", "rt-multi-thread"] }
+uuid = { version = "1.19", features = ["v4"] }
 
 [dev-dependencies]
 rusty-hook = "0.11"
