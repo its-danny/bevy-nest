@@ -2,6 +2,14 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [0.7.0](https://github.com/its-danny/bevy-nest/compare/90e51a0958d3066440884b791c5b76212c291c6e..0.7.0) - 2026-01-16
+#### Continuous Integration
+- use devenv - ([d36c4ae](https://github.com/its-danny/bevy-nest/commit/d36c4ae18b74565c9a15247ccbeeb816968de235)) - Danny Tatom
+#### Refactoring
+- replace custom telnet impl with libmudtelnet - ([90e51a0](https://github.com/its-danny/bevy-nest/commit/90e51a0958d3066440884b791c5b76212c291c6e)) - Danny Tatom
+
+- - -
+
 ## [0.6.0](https://github.com/its-danny/bevy-nest/compare/85ff24e7c8ebed43ce76453c842bc141b1b7f9ec..0.6.0) - 2026-01-16
 #### Miscellaneous Chores
 - update bevy to 0.18 - ([85ff24e](https://github.com/its-danny/bevy-nest/commit/85ff24e7c8ebed43ce76453c842bc141b1b7f9ec)) - Danny Tatom
